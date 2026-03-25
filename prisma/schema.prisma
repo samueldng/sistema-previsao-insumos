@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Registro {
+  id        String   @id @default(cuid())
+  unidade   String
+  periodo   String   // Formato "YYYY-MM"
+  exames    Int      @default(0)
+  pacientes Int      @default(0)
+  origem    String   @default("manual") // "manual" ou "import"
+  
+  consumos  Consumo[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([unidade, periodo])
+}
+
+model Consumo {
+  id         String   @id @default(cuid())
+  quantidade Int      @default(0)
+  
+  insumoNome String
+  categoria  String
+  
+  registroId String
+  registro   Registro @relation(fields: [registroId], references: [id], onDelete: Cascade)
+
+  @@unique([registroId, insumoNome])
+  @@index([registroId])
+}

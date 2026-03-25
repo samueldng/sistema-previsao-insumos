@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hemolab · Previsão de Insumos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap');
+
+:root {
+  --bg:#0a0e17; --surface:#111827; --surface2:#1a2235; --border:#1e2d45;
+  --accent:#00c8a0; --accent2:#0080ff; --warn:#ff6b35;
+  --text:#e2eaf5; --muted:#5a7090; --red:#ff4d6d;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,200,160,0.03)1px,transparent 1px),linear-gradient(90deg,rgba(0,200,160,0.03)1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+#app{position:relative;z-index:1;}
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid var(--border);background:rgba(10,14,23,0.97);backdrop-filter:blur(12px);position:sticky;top:0;z-index:100;}
+.logo{display:flex;align-items:center;gap:12px;}
+.logo-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;}
+.logo-text{font-size:20px;font-weight:800;letter-spacing:-0.5px;}
+.logo-text span{color:var(--accent);}
+.header-meta{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);text-align:right;line-height:1.7;}
+.nav-tabs{display:flex;gap:4px;padding:13px 28px;border-bottom:1px solid var(--border);background:var(--surface);overflow-x:auto;}
+.tab{padding:8px 15px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);transition:all 0.2s;white-space:nowrap;border:1px solid transparent;}
+.tab:hover{color:var(--text);background:var(--surface2);}
+.tab.active{color:var(--accent);background:rgba(0,200,160,0.1);border-color:rgba(0,200,160,0.3);}
+main{padding:22px 28px;max-width:1700px;margin:0 auto;}
+.section{display:none;}.section.active{display:block;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.card-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent);}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:20px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:15px 17px;position:relative;overflow:hidden;}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent2));}
+.stat-label{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;}
+.stat-value{font-size:24px;font-weight:800;font-family:'DM Mono',monospace;}
+.stat-sub{font-size:10px;color:var(--muted);margin-top:3px;font-family:'DM Mono',monospace;}
+.c-green{color:var(--accent);}.c-blue{color:var(--accent2);}.c-orange{color:var(--warn);}
+.upload-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;}
+.upload-zone{border:2px dashed var(--border);border-radius:12px;padding:26px 20px;text-align:center;cursor:pointer;transition:all 0.3s;background:var(--surface2);}
+.upload-zone:hover,.upload-zone.drag-over{border-color:var(--accent);background:rgba(0,200,160,0.05);}
+.upload-zone.has-data{border-color:var(--accent);border-style:solid;}
+.upload-icon{font-size:30px;margin-bottom:9px;}
+.upload-title{font-size:13px;font-weight:700;margin-bottom:4px;}
+.upload-hint{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;}
+.upload-status{font-size:11px;margin-top:7px;color:var(--accent);font-family:'DM Mono',monospace;}
+input[type=file]{display:none;}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:11px;}
+.form-group{display:flex;flex-direction:column;gap:5px;}
+.form-group label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);}
+select,input[type=number],input[type=text]{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:9px 11px;font-family:'Syne',sans-serif;font-size:13px;transition:border-color 0.2s;width:100%;}
+select:focus,input:focus{outline:none;border-color:var(--accent);}
+select option{background:var(--surface);}
+.btn{padding:9px 17px;border-radius:7px;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;cursor:pointer;border:none;transition:all 0.2s;display:inline-flex;align-items:center;gap:6px;}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;}
+.btn-primary:hover{opacity:0.85;transform:translateY(-1px);}
+.btn-outline{background:transparent;border:1px solid var(--accent);color:var(--accent);}
+.btn-outline:hover{background:rgba(0,200,160,0.1);}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.btn-ghost:hover{border-color:var(--text);color:var(--text);}
+.btn-danger{background:rgba(255,77,109,0.12);border:1px solid rgba(255,77,109,0.35);color:var(--red);}
+.btn-danger:hover{background:rgba(255,77,109,0.22);}
+.btn-sm{padding:5px 11px;font-size:11px;}
+.btn-lg{padding:11px 24px;font-size:14px;}
+.table-wrap{overflow-x:auto;border-radius:9px;border:1px solid var(--border);}
+table{width:100%;border-collapse:collapse;}
+thead tr{background:var(--surface2);}
+th{padding:10px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);text-align:left;white-space:nowrap;border-bottom:1px solid var(--border);}
+td{padding:9px 12px;font-size:12px;border-bottom:1px solid rgba(30,45,69,0.5);font-family:'DM Mono',monospace;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(255,255,255,0.02);}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;font-family:'DM Mono',monospace;}
+.bg-green{background:rgba(0,200,160,0.15);color:var(--accent);}
+.bg-blue{background:rgba(0,128,255,0.15);color:var(--accent2);}
+.bg-orange{background:rgba(255,107,53,0.15);color:var(--warn);}
+.bg-red{background:rgba(255,77,109,0.15);color:var(--red);}
+.previsao-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:13px;}
+.prev-card{background:var(--surface);border:1px solid var(--border);border-radius:11px;overflow:hidden;}
+.prev-card-head{padding:12px 15px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.unit-name{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;}
+.prev-body{padding:9px;}
+.cat-label{font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:0.8px;padding:6px 7px 2px;border-top:1px solid var(--border);margin-top:4px;}
+.prev-row{display:flex;align-items:center;justify-content:space-between;padding:5px 7px;border-radius:5px;}
+.prev-row:hover{background:var(--surface2);}
+.insumo-name{font-size:11px;flex:1;margin-right:9px;font-family:'Syne',sans-serif;}
+.insumo-qty{font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:var(--accent);min-width:40px;text-align:right;}
+.chart-container{position:relative;height:280px;}
+.chart-sm{height:210px;}
+.manual-scroll{max-height:460px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;}
+.manual-table{width:100%;border-collapse:collapse;}
+.manual-table th{padding:8px 11px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;background:var(--surface2);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:2;}
+.manual-table td{padding:6px 11px;border-bottom:1px solid rgba(30,45,69,0.4);}
+.manual-table input{background:var(--surface2);border:1px solid var(--border);color:var(--accent);border-radius:6px;padding:4px 8px;font-size:13px;font-family:'DM Mono',monospace;width:95px;text-align:right;}
+.manual-table input:focus{outline:none;border-color:var(--accent);}
+.cat-sep td{background:rgba(0,200,160,0.05);font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px;padding:5px 11px;border-top:1px solid rgba(0,200,160,0.2);}
+.alert{padding:10px 14px;border-radius:7px;font-size:12px;margin-bottom:13px;line-height:1.5;}
+.alert-info{background:rgba(0,128,255,0.1);border:1px solid rgba(0,128,255,0.3);color:#7ab8ff;}
+.alert-success{background:rgba(0,200,160,0.1);border:1px solid rgba(0,200,160,0.3);color:var(--accent);}
+.alert-warn{background:rgba(255,107,53,0.1);border:1px solid rgba(255,107,53,0.3);color:var(--warn);}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:4px;}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;transition:width 0.6s ease;}
+.flex{display:flex;}.gap-2{gap:8px;}.gap-3{gap:12px;}.items-center{align-items:center;}.justify-between{justify-content:space-between;}.flex-wrap{flex-wrap:wrap;}
+.mb-3{margin-bottom:12px;}.mb-4{margin-bottom:16px;}.mt-3{margin-top:12px;}.mt-4{margin-top:16px;}
+.font-mono{font-family:'DM Mono',monospace;}.text-muted{color:var(--muted);}
+.empty-state{text-align:center;padding:46px 20px;color:var(--muted);}
+.empty-state .icon{font-size:42px;margin-bottom:12px;}
+.empty-state p{font-size:13px;}
+.tag{display:inline-block;background:rgba(0,200,160,0.08);border:1px solid rgba(0,200,160,0.2);color:var(--accent);font-size:9px;font-family:'DM Mono',monospace;padding:1px 6px;border-radius:4px;}
+::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+/* ============ PRINT ============ */
+@media print {
+  @page{margin:12mm 10mm;size:A4 portrait;}
+  body{background:#fff!important;color:#111!important;font-family:Arial,sans-serif!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  body::before{display:none!important;}
+  header,.nav-tabs,.no-print,.btn{display:none!important;}
+  main{padding:0!important;}
+  .section{display:none!important;}
+  #print-area{display:block!important;padding:0;}
+  .print-page{page-break-after:always;padding:0 0 12mm 0;}
+  .print-page:last-child{page-break-after:avoid;}
+  .print-logo{display:flex!important;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #00c8a0;}
+  .print-logo-icon{width:32px;height:32px;background:#00c8a0;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+  .print-logo-text{font-size:18pt;font-weight:800;}
+  .print-section-title{font-size:13pt;font-weight:700;color:#111;border-bottom:1.5px solid #00c8a0;padding-bottom:5px;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;}
+  .print-meta{font-size:9pt;color:#555;margin-bottom:14px;font-family:'Courier New',monospace;}
+  .print-summary-table{width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:16px;}
+  .print-summary-table th{background:#1a2235;color:#fff;padding:6px 9px;text-align:left;font-size:8pt;border:1px solid #ccc;}
+  .print-summary-table td{padding:5px 9px;border:1px solid #ddd;font-size:9pt;}
+  .print-summary-table tr:nth-child(even) td{background:#f8f8f8;}
+  .print-summary-table .total-row td{background:#e8fff7!important;font-weight:700;border-top:2px solid #00c8a0;}
+  .print-chart-row{display:grid!important;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;}
+  .print-chart-box{border:1px solid #ddd;border-radius:6px;padding:12px;}
+  .print-chart-title{font-size:10pt;font-weight:700;margin-bottom:8px;color:#333;text-transform:uppercase;letter-spacing:0.5px;}
+  .print-insumo-grid{display:grid!important;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}
+  .print-cat-box{border:1px solid #ddd;border-radius:6px;overflow:hidden;break-inside:avoid;}
+  .print-cat-head{background:#f0faf7;border-bottom:1px solid #ddd;padding:7px 10px;font-size:9pt;font-weight:700;text-transform:uppercase;color:#007755;display:flex;justify-content:space-between;}
+  .print-cat-row{display:flex;justify-content:space-between;padding:4px 10px;border-bottom:1px solid #f0f0f0;font-size:9pt;}
+  .print-cat-row:last-child{border-bottom:none;}
+  .print-cat-qty{font-weight:700;color:#007755;font-family:'Courier New',monospace;}
+  .print-unit-section{margin-bottom:16px;break-inside:avoid;}
+  .print-unit-head{background:#1a2235;color:#fff;padding:8px 12px;font-size:10pt;font-weight:700;text-transform:uppercase;border-radius:6px 6px 0 0;}
+  .print-unit-table{width:100%;border-collapse:collapse;font-size:9pt;}
+  .print-unit-table th{background:#f5f5f5;padding:5px 9px;text-align:left;font-size:8pt;border:1px solid #ddd;}
+  .print-unit-table td{padding:4px 9px;border:1px solid #ddd;font-size:9pt;}
+  .print-unit-table tr:nth-child(even) td{background:#fafafa;}
+  .page-num{text-align:center;font-size:8pt;color:#999;margin-top:8px;}
+  canvas{max-width:100%!important;max-height:200px!important;}
+}
+#print-area{display:none;}
+</style>
+</head>
+<body>
+<div id="app">
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🧪</div>
+    <div>
+      <div class="logo-text">HEMO<span>LAB</span></div>
+      <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:1px">SISTEMA DE PREVISÃO DE INSUMOS</div>
+    </div>
+  </div>
+  <div class="header-meta">
+    <div id="clock">—</div>
+    <div id="data-status" style="color:var(--muted)">Sem dados carregados</div>
+  </div>
+</header>
+
+<nav class="nav-tabs">
+  <div class="tab active"  onclick="switchTab('dashboard',this)">📊 Dashboard</div>
+  <div class="tab"         onclick="switchTab('upload',this)">📁 Importar</div>
+  <div class="tab"         onclick="switchTab('manual',this)">✏️ Entrada Manual</div>
+  <div class="tab"         onclick="switchTab('previsao',this)">🔮 Previsão</div>
+  <div class="tab"         onclick="switchTab('ranking',this)">📈 Análises</div>
+  <div class="tab"         onclick="switchTab('relatorio',this)">📋 Relatório Consolidado</div>
+</nav>
+
+<main>
+
+<!-- DASHBOARD -->
+<section id="tab-dashboard" class="section active">
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-label">Unidades</div><div class="stat-value c-green" id="st-un">24</div><div class="stat-sub">cadastradas</div></div>
+    <div class="stat-card"><div class="stat-label">Períodos</div><div class="stat-value c-blue" id="st-per">0</div><div class="stat-sub">registrados</div></div>
+    <div class="stat-card"><div class="stat-label">Exames</div><div class="stat-value" id="st-ex">0</div><div class="stat-sub">acumulados</div></div>
+    <div class="stat-card"><div class="stat-label">Pacientes</div><div class="stat-value c-orange" id="st-pa">0</div><div class="stat-sub">atendimentos</div></div>
+    <div class="stat-card"><div class="stat-label">Registros</div><div class="stat-value" id="st-reg">0</div><div class="stat-sub">no sistema</div></div>
+    <div class="stat-card"><div class="stat-label">Insumos</div><div class="stat-value c-green">65</div><div class="stat-sub">mapeados</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:16px;margin-bottom:16px;">
+    <div class="card"><div class="card-header"><span class="card-title">Por Categoria</span></div><div class="chart-container"><canvas id="chart-cat"></canvas></div></div>
+    <div class="card"><div class="card-header"><span class="card-title">Top 10 Insumos</span></div><div class="chart-container"><canvas id="chart-top"></canvas></div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div class="card"><div class="card-header"><span class="card-title">Evolução Mensal</span></div><div class="chart-container chart-sm"><canvas id="chart-evol"></canvas></div></div>
+    <div class="card"><div class="card-header"><span class="card-title">Últimos Registros</span></div><div id="dash-recent"></div></div>
+  </div>
+</section>
+
+<!-- UPLOAD -->
+<section id="tab-upload" class="section">
+  <div class="alert alert-info">📋 Importe planilhas <strong>.xlsx</strong> ou <strong>.csv</strong>. O sistema mapeia colunas automaticamente. Colunas esperadas: <strong>Unidade · Período · Insumo · Quantidade</strong></div>
+  <div class="upload-grid mb-4">
+    <div>
+      <div class="upload-zone" id="zone-pedidos" onclick="document.getElementById('fp').click()">
+        <div class="upload-icon">📦</div><div class="upload-title">Pedidos / Consumo</div>
+        <div class="upload-hint">Histórico de insumos por unidade/período</div>
+        <div class="upload-status" id="sp">Clique ou arraste o arquivo</div>
+      </div>
+      <input type="file" id="fp" accept=".xlsx,.csv" onchange="handleUpload(this,'pedidos')">
+    </div>
+    <div>
+      <div class="upload-zone" id="zone-exames" onclick="document.getElementById('fe').click()">
+        <div class="upload-icon">🔬</div><div class="upload-title">Exames por Convênio</div>
+        <div class="upload-hint">Total de exames realizados por período</div>
+        <div class="upload-status" id="se">Clique ou arraste o arquivo</div>
+      </div>
+      <input type="file" id="fe" accept=".xlsx,.csv" onchange="handleUpload(this,'exames')">
+    </div>
+    <div>
+      <div class="upload-zone" id="zone-pacientes" onclick="document.getElementById('fpa').click()">
+        <div class="upload-icon">👥</div><div class="upload-title">Pacientes Atendidos</div>
+        <div class="upload-hint">Volume de atendimentos por unidade/período</div>
+        <div class="upload-status" id="spa">Clique ou arraste o arquivo</div>
+      </div>
+      <input type="file" id="fpa" accept=".xlsx,.csv" onchange="handleUpload(this,'pacientes')">
+    </div>
+  </div>
+  <div class="card" id="preview-card" style="display:none">
+    <div class="card-header">
+      <span class="card-title">Pré-visualização</span>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary btn-sm" onclick="processarImport()">✅ Confirmar Importação</button>
+        <button class="btn btn-danger btn-sm" onclick="cancelarImport()">✕ Cancelar</button>
+      </div>
+    </div>
+    <div id="preview-content"></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><span class="card-title">Formato Esperado</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px">
+      <div><div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:8px">PEDIDOS / CONSUMO</div>
+        <div class="table-wrap"><table><thead><tr><th>Unidade</th><th>Período</th><th>Insumo</th><th>Qtd</th></tr></thead>
+        <tbody><tr><td>BIORIM</td><td>2025-01</td><td>Tubo Soro 5ml</td><td>500</td></tr><tr><td>BIORIM</td><td>2025-02</td><td>Luva P</td><td>300</td></tr></tbody></table></div>
+      </div>
+      <div><div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:8px">EXAMES POR CONVÊNIO</div>
+        <div class="table-wrap"><table><thead><tr><th>Unidade</th><th>Período</th><th>Convênio</th><th>Total</th></tr></thead>
+        <tbody><tr><td>BIORIM</td><td>2025-01</td><td>Unimed</td><td>420</td></tr><tr><td>BIORIM</td><td>2025-01</td><td>Particular</td><td>180</td></tr></tbody></table></div>
+      </div>
+      <div><div style="font-size:11px;color:var(--muted);font-weight:700;margin-bottom:8px">PACIENTES ATENDIDOS</div>
+        <div class="table-wrap"><table><thead><tr><th>Unidade</th><th>Período</th><th>Pacientes</th></tr></thead>
+        <tbody><tr><td>BIORIM</td><td>2025-01</td><td>380</td></tr><tr><td>BIORIM</td><td>2025-02</td><td>410</td></tr></tbody></table></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MANUAL -->
+<section id="tab-manual" class="section">
+  <div class="card">
+    <div class="card-header"><span class="card-title">Identificação do Período</span></div>
+    <div class="form-grid mb-3">
+      <div class="form-group"><label>Unidade</label><select id="m-un"><option value="">Selecione...</option></select></div>
+      <div class="form-group"><label>Período (AAAA-MM)</label><input type="text" id="m-per" placeholder="ex: 2025-03"></div>
+      <div class="form-group"><label>Total de Exames</label><input type="number" id="m-ex" min="0" placeholder="0"></div>
+      <div class="form-group"><label>Pacientes Atendidos</label><input type="number" id="m-pa" min="0" placeholder="0"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Quantidades Consumidas por Insumo</span>
+      <div class="flex gap-2">
+        <button class="btn btn-ghost btn-sm" onclick="zerarManual()">⟳ Zerar</button>
+        <button class="btn btn-primary" onclick="salvarManual()">💾 Salvar Registro</button>
+      </div>
+    </div>
+    <div class="manual-scroll">
+      <table class="manual-table">
+        <thead><tr><th>#</th><th>Insumo</th><th>Categoria</th><th style="text-align:right">Quantidade</th></tr></thead>
+        <tbody id="manual-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Histórico de Registros</span>
+      <button class="btn btn-danger btn-sm" onclick="limparTodos()">🗑 Limpar Todos</button>
+    </div>
+    <div id="registros-list"></div>
+  </div>
+</section>
+
+<!-- PREVISÃO -->
+<section id="tab-previsao" class="section">
+  <div class="card">
+    <div class="card-header"><span class="card-title">Parâmetros</span></div>
+    <div class="form-grid">
+      <div class="form-group"><label>Unidade</label><select id="pv-un"><option value="todas">Todas as Unidades</option></select></div>
+      <div class="form-group"><label>Método</label>
+        <select id="pv-met">
+          <option value="media">Média Simples (todos os períodos)</option>
+          <option value="media3">Média dos últimos 3 períodos</option>
+          <option value="media6">Média dos últimos 6 períodos</option>
+          <option value="tendencia">Tendência Linear</option>
+          <option value="maximo">Pico Máximo (conservador)</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Margem de Segurança (%)</label><input type="number" id="pv-mg" value="10" min="0" max="100"></div>
+      <div class="form-group"><label>Tipo de Período</label>
+        <select id="pv-tipo">
+          <option value="mensal">Mensal (30 dias)</option>
+          <option value="quinzenal">Quinzenal (15 dias)</option>
+        </select>
+      </div>
+      <div class="form-group" style="align-self:flex-end"><button class="btn btn-primary btn-lg" onclick="gerarPrevisao()" style="width:100%">🔮 Gerar Previsão</button></div>
+    </div>
+  </div>
+  <div id="prev-output"><div class="empty-state"><div class="icon">🔮</div><p>Configure e gere a previsão</p></div></div>
+</section>
+
+<!-- ANÁLISES -->
+<section id="tab-ranking" class="section">
+  <div class="flex gap-3 mb-3 flex-wrap">
+    <div class="form-group" style="flex:1;min-width:170px"><label>Unidade</label><select id="rk-un" onchange="buildRanking()"><option value="todas">Todas</option></select></div>
+    <div class="form-group" style="flex:1;min-width:170px"><label>Categoria</label><select id="rk-cat" onchange="buildRanking()"><option value="todas">Todas</option></select></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+    <div class="card"><div class="card-header"><span class="card-title">Top 15 Insumos por Volume</span></div><div id="rank-list"></div></div>
+    <div class="card"><div class="card-header"><span class="card-title">Consumo por Unidade</span></div><div class="chart-container"><canvas id="chart-units"></canvas></div></div>
+  </div>
+  <div class="card"><div class="card-header"><span class="card-title">Comparativo por Categoria entre Unidades</span></div><div class="chart-container" style="height:260px"><canvas id="chart-comp"></canvas></div></div>
+</section>
+
+<!-- RELATÓRIO -->
+<section id="tab-relatorio" class="section">
+  <div class="card no-print">
+    <div class="card-header"><span class="card-title">Configurar Relatório Consolidado</span></div>
+    <div class="form-grid mb-3">
+      <div class="form-group"><label>Método de Previsão</label>
+        <select id="rel-met">
+          <option value="media">Média Simples</option>
+          <option value="media3">Últimos 3 Períodos</option>
+          <option value="media6">Últimos 6 Períodos</option>
+          <option value="tendencia">Tendência Linear</option>
+          <option value="maximo">Pico Máximo</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Margem de Segurança (%)</label><input type="number" id="rel-mg" value="10" min="0" max="100"></div>
+      <div class="form-group"><label>Período de Referência</label><input type="text" id="rel-ref" placeholder="ex: 2025-04"></div>
+      <div class="form-group"><label>Tipo de Período</label>
+        <select id="rel-tipo">
+          <option value="mensal">Mensal (30 dias)</option>
+          <option value="quinzenal">Quinzenal (15 dias)</option>
+        </select>
+      </div>
+      <div class="form-group" style="align-self:flex-end;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="gerarRelatorio()">📋 Gerar</button>
+        <button class="btn btn-outline" onclick="imprimirRelatorio()">🖨️ Imprimir</button>
+        <button class="btn btn-ghost" onclick="exportarExcel()">📥 Excel</button>
+      </div>
+    </div>
+  </div>
+  <div id="relatorio-area"><div class="empty-state"><div class="icon">📋</div><p>Configure e clique em <strong>Gerar Relatório</strong></p></div></div>
+</section>
+
+</main>
+</div>
+
+<!-- PRINT AREA -->
+<div id="print-area"></div>
+
+<script>
+// ===== MASTER DATA =====
+const UNIDADES=['MULTICLIN AA','BIORIM','CENTRO MEDICO','CLINICA RIBEIRO','DR SAUDE','MATERGIN','MATRIZ HEMOLAB','SANTA TEREZA','CIOMED BARRA DO CORDA','BOM LUGAR','CIOMED ESP','SÃO THIAGO ESP','DR PEDRO','BEM ESTAR LDP','DR MARK LDP','ULTRAMEDIC LDP','BEM ESTAR LDR','MAIS SAÚDE','MARIA BRAGA','DRA SAUDE','MULTICLIN SM','SÃO ROBERTO','SATUBINHA','VITALES'];
+const INSUMOS=[
+  {c:'Tubos de Coleta',n:'Tubo de Soro 3,5 ml'},{c:'Tubos de Coleta',n:'Tubo de Soro 5,0 ml'},
+  {c:'Tubos de Coleta',n:'Tubo de EDTA 2,0 ml'},{c:'Tubos de Coleta',n:'Tubo de EDTA 4,0 ml'},
+  {c:'Tubos de Coleta',n:'Tubo de Citrato 4,0 ml'},{c:'Tubos de Coleta',n:'Tubo de Fluoreto 4,0 ml'},
+  {c:'Tubos de Coleta',n:'Tubo de Heparina 4,0 ml (Verde)'},{c:'Tubos de Coleta',n:'Tubo de Heparina 6,0 ml (Azul)'},
+  {c:'Tubos de Coleta',n:'Tubo K2 EDTA Gel (Sexagem Fetal)'},{c:'Tubos de Coleta',n:'Tubo Trace 6,0 ml'},
+  {c:'Tubos de Coleta',n:'Tubo Soro Âmbar c/ Gel'},{c:'Tubos de Coleta',n:'Tubo Âmbar EDTA'},
+  {c:'Tubos de Coleta',n:'Tubo de Transporte'},
+  {c:'Punção e Coleta',n:'Scalp 23G a Vácuo'},{c:'Punção e Coleta',n:'Scalp 25G a Vácuo'},
+  {c:'Punção e Coleta',n:'Agulha Vácuo 25x07 22G'},{c:'Punção e Coleta',n:'Escalpe Seringa Infusão 23G'},
+  {c:'Punção e Coleta',n:'Seringa 5ml'},{c:'Punção e Coleta',n:'Seringa 10ml'},{c:'Punção e Coleta',n:'Seringa 20ml'},
+  {c:'Punção e Coleta',n:'Lanceta 28G x 1,8mm'},{c:'Punção e Coleta',n:'Garrote em Tiras 45cm'},
+  {c:'Punção e Coleta',n:'Algodão Hidrófilo 500g'},{c:'Punção e Coleta',n:'Curativo Redondo (Blood Stop)'},
+  {c:'Punção e Coleta',n:'Curativo Infantil'},
+  {c:'Kits de Coleta',n:'Kit Urina Universal 12ml'},{c:'Kits de Coleta',n:'Coletor Universal Estéril 80ml'},
+  {c:'Kits de Coleta',n:'Coletor Universal Estéril 50ml'},{c:'Kits de Coleta',n:'Coletor Urina 24h 2L'},
+  {c:'Kits de Coleta',n:'Coletor Urina 24h 3L c/ HCl'},{c:'Kits de Coleta',n:'Coletor Urina Infantil 100ml'},
+  {c:'Kits de Coleta',n:'Salivette Cortisol'},{c:'Kits de Coleta',n:'Swab Plástico'},
+  {c:'Kits de Coleta',n:'Swab Stuart'},{c:'Kits de Coleta',n:'Swab Amies'},
+  {c:'Kits de Coleta',n:'Kit Citologia Líquida'},
+  {c:'Ginecologia',n:'Espéculo Vaginal P'},{c:'Ginecologia',n:'Espéculo Vaginal M'},{c:'Ginecologia',n:'Espéculo Vaginal G'},
+  {c:'Ginecologia',n:'Espátula de Ayres'},{c:'Ginecologia',n:'Escova Cervical'},
+  {c:'Ginecologia',n:'Lâmina Fosca 26x76mm'},{c:'Ginecologia',n:'Fixador de Célula'},
+  {c:'Testes Especializados',n:'Teste Tolerância Glicose'},{c:'Testes Especializados',n:'Teste Tolerância Lactose'},
+  {c:'Testes Especializados',n:'Teste do Pezinho'},{c:'Testes Especializados',n:'Teste de Paternidade'},
+  {c:'Testes Especializados',n:'Kit Toxicológico'},{c:'Testes Especializados',n:'Kit Quantiferon'},
+  {c:'Testes Especializados',n:'Tiras Glicose On Call Plus II'},
+  {c:'EPIs e Segurança',n:'Máscara Tripla'},{c:'EPIs e Segurança',n:'Touca Sanfonada'},
+  {c:'EPIs e Segurança',n:'Luva de Procedimento Látex P'},{c:'EPIs e Segurança',n:'Luva de Procedimento Látex M'},
+  {c:'EPIs e Segurança',n:'Avental Descartável'},{c:'EPIs e Segurança',n:'Saco Lixo Infectante 30L'},
+  {c:'EPIs e Segurança',n:'Caixa Perfuro Cortante (Descartex)'},
+  {c:'Insumos Técnicos',n:'Álcool Líquido 70%'},{c:'Insumos Técnicos',n:'Álcool em Gel'},
+  {c:'Insumos Técnicos',n:'Álcool 99%'},{c:'Insumos Técnicos',n:'Lâmina de Bisturi N.22'},
+  {c:'Insumos Técnicos',n:'Ponteira Amarela 200μl'},{c:'Insumos Técnicos',n:'Gaze tipo Queijo'},
+  {c:'Insumos Técnicos',n:'Papel Lençol para Maca'},{c:'Insumos Técnicos',n:'Palitos de Picolé'},
+  {c:'Insumos Técnicos',n:'Papel A4'},
+];
+const CATS=[...new Set(INSUMOS.map(i=>i.c))];
+const CAT_COLORS=['#00c8a0','#0080ff','#ff6b35','#ff4d6d','#a855f7','#f59e0b','#06b6d4'];
+const METODO_LABEL={media:'Média Simples',media3:'Média 3 Per.',media6:'Média 6 Per.',tendencia:'Tendência Linear',maximo:'Pico Máximo'};
+
+// ===== STATE =====
+let DB=JSON.parse(localStorage.getItem('hlab_db')||'[]');
+let uploadBuf=null;
+let CI={}; // chart instances
+
+// ===== INIT =====
+function init(){
+  populateSelects();
+  buildManualTable();
+  renderRegistros();
+  updateStats();
+  buildDashCharts();
+  initClock();
+  const now=new Date(); now.setMonth(now.getMonth()+1);
+  document.getElementById('rel-ref').value=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+}
+
+function populateSelects(){
+  ['m-un','pv-un','rk-un'].forEach(id=>{
+    const el=document.getElementById(id); if(!el) return;
+    const all=id!=='m-un';
+    el.innerHTML=all?'<option value="todas">Todas as Unidades</option>':'<option value="">Selecione...</option>';
+    UNIDADES.forEach(u=>el.innerHTML+=`<option value="${u}">${u}</option>`);
+  });
+  const rk=document.getElementById('rk-cat');
+  if(rk){rk.innerHTML='<option value="todas">Todas</option>';CATS.forEach(c=>rk.innerHTML+=`<option value="${c}">${c}</option>`);}
+}
+
+// ===== MANUAL TABLE =====
+function buildManualTable(){
+  let html='',last='';
+  INSUMOS.forEach((ins,i)=>{
+    if(ins.c!==last){html+=`<tr class="cat-sep"><td colspan="4">${ins.c}</td></tr>`;last=ins.c;}
+    html+=`<tr><td style="color:var(--muted);font-size:10px">${i+1}</td><td style="font-family:'Syne',sans-serif;font-size:11px">${ins.n}</td><td><span class="tag">${ins.c}</span></td><td style="text-align:right"><input type="number" id="q${i}" min="0" placeholder="0"></td></tr>`;
+  });
+  document.getElementById('manual-tbody').innerHTML=html;
+}
+
+function zerarManual(){INSUMOS.forEach((_,i)=>{const el=document.getElementById(`q${i}`);if(el)el.value=''});}
+
+function salvarManual(){
+  const un=document.getElementById('m-un').value;
+  const per=document.getElementById('m-per').value.trim();
+  const ex=parseInt(document.getElementById('m-ex').value)||0;
+  const pa=parseInt(document.getElementById('m-pa').value)||0;
+  if(!un||!per){alert('⚠️ Selecione a unidade e informe o período!');return;}
+  const qtds=INSUMOS.map((_,i)=>parseInt(document.getElementById(`q${i}`)?.value)||0);
+  const idx=DB.findIndex(r=>r.un===un&&r.per===per);
+  if(idx>=0){if(!confirm(`Já existe registro para ${un} em ${per}. Sobrescrever?`))return;DB[idx]={...DB[idx],ex,pa,qtds};}
+  else DB.push({id:Date.now(),un,per,ex,pa,qtds,src:'manual'});
+  saveDB();renderRegistros();updateStats();buildDashCharts();
+  alert('✅ Registro salvo!');
+}
+
+function limparTodos(){if(!confirm('Apagar todos os registros?'))return;DB=[];saveDB();renderRegistros();updateStats();buildDashCharts();}
+function excluirReg(id){DB=DB.filter(r=>r.id!==id);saveDB();renderRegistros();updateStats();}
+function saveDB(){localStorage.setItem('hlab_db',JSON.stringify(DB));}
+
+function renderRegistros(){
+  const el=document.getElementById('registros-list');
+  if(!DB.length){el.innerHTML='<div class="empty-state"><div class="icon">📭</div><p>Sem registros cadastrados</p></div>';return;}
+  const s=[...DB].sort((a,b)=>b.per.localeCompare(a.per));
+  let html='<div class="table-wrap"><table><thead><tr><th>Unidade</th><th>Período</th><th>Exames</th><th>Pacientes</th><th>Itens</th><th>Origem</th><th></th></tr></thead><tbody>';
+  s.forEach(r=>{
+    const tot=r.qtds.reduce((s,v)=>s+v,0);
+    html+=`<tr><td style="font-weight:700;font-family:'Syne',sans-serif">${r.un}</td><td>${r.per}</td><td>${(r.ex||0).toLocaleString()}</td><td>${(r.pa||0).toLocaleString()}</td><td><span class="badge bg-green">${tot.toLocaleString()}</span></td><td><span class="badge ${r.src==='manual'?'bg-blue':'bg-orange'}">${r.src}</span></td><td><button class="btn btn-danger btn-sm" onclick="excluirReg(${r.id})">✕</button></td></tr>`;
+  });
+  html+='</tbody></table></div>';
+  el.innerHTML=html;
+}
+
+// ===== UPLOAD =====
+function handleUpload(input,tipo){
+  const file=input.files[0];if(!file)return;
+  const sid={pedidos:'sp',exames:'se',pacientes:'spa'}[tipo];
+  document.getElementById(sid).textContent='⏳ Processando...';
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      let data=[];
+      if(file.name.endsWith('.csv')){
+        const lines=e.target.result.split('\n').filter(l=>l.trim());
+        const headers=lines[0].split(',').map(h=>h.trim().toLowerCase());
+        for(let i=1;i<lines.length;i++){const vals=lines[i].split(',');const row={};headers.forEach((h,j)=>row[h]=(vals[j]||'').trim());if(Object.values(row).some(v=>v))data.push(row);}
+      }else{
+        const wb=XLSX.read(e.target.result,{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        data=XLSX.utils.sheet_to_json(ws,{defval:''});
+        data=data.map(row=>{const r={};Object.keys(row).forEach(k=>r[k.toLowerCase().trim()]=String(row[k]).trim());return r;});
+      }
+      uploadBuf={tipo,data,file:file.name};
+      document.getElementById(sid).textContent=`✅ ${data.length} linhas`;
+      document.getElementById(`zone-${tipo}`).classList.add('has-data');
+      showPreview(data);
+    }catch(err){document.getElementById(sid).textContent='❌ Erro';console.error(err);}
+  };
+  if(file.name.endsWith('.csv'))reader.readAsText(file,'utf-8');
+  else reader.readAsArrayBuffer(file);
+}
+
+function showPreview(data){
+  document.getElementById('preview-card').style.display='block';
+  const prev=data.slice(0,8);
+  const headers=prev.length?Object.keys(prev[0]):[];
+  let html=`<p style="font-size:11px;color:var(--muted);margin-bottom:9px">${data.length} registros — exibindo primeiros 8</p><div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>`;
+  prev.forEach(row=>html+=`<tr>${headers.map(h=>`<td>${row[h]||'-'}</td>`).join('')}</tr>`);
+  html+='</tbody></table></div>';
+  document.getElementById('preview-content').innerHTML=html;
+}
+
+function processarImport(){
+  if(!uploadBuf)return;
+  const{tipo,data}=uploadBuf;
+  const cmap={unidade:['unidade','unit','filial','posto','local'],periodo:['periodo','período','mes','mês','month','competência','competencia','data'],insumo:['insumo','material','produto','item','descrição','descricao'],qtd:['quantidade','qtd','qty','amount','qtde','total','valor'],exames:['exames','total_exames','total exames'],pacientes:['pacientes','total_pacientes','atendimentos','patients']};
+  const fc=(row,keys)=>{const rk=Object.keys(row).map(k=>k.toLowerCase());for(const k of keys){const f=rk.find(rk2=>rk2.includes(k));if(f)return f;}return null;};
+  const mu=raw=>{const u=raw.toUpperCase().trim();return UNIDADES.find(x=>x===u||u.startsWith(x.split(' ')[0]))||raw;};
+  let n=0;
+  data.forEach(row=>{
+    const uC=fc(row,cmap.unidade),pC=fc(row,cmap.periodo);
+    if(!uC||!pC)return;
+    const un=mu(row[uC]||''),per=(row[pC]||'').toString().trim();
+    if(!un||!per)return;
+    if(tipo==='pedidos'){
+      const iC=fc(row,cmap.insumo),qC=fc(row,cmap.qtd);if(!iC||!qC)return;
+      const ir=(row[iC]||'').toString().trim(),qty=parseFloat(row[qC])||0;if(!ir||!qty)return;
+      const mi=INSUMOS.findIndex(ins=>ins.n.toLowerCase().includes(ir.toLowerCase().substring(0,10))||ir.toLowerCase().includes(ins.n.toLowerCase().split(' ').slice(0,2).join(' ')));
+      const ex=DB.find(r=>r.un===un&&r.per===per);
+      if(ex){if(mi>=0)ex.qtds[mi]=(ex.qtds[mi]||0)+qty;}
+      else{const qtds=new Array(INSUMOS.length).fill(0);if(mi>=0)qtds[mi]=qty;DB.push({id:Date.now()+n,un,per,ex:0,pa:0,qtds,src:'import'});}
+      n++;
+    }else{
+      const tC=fc(row,tipo==='exames'?cmap.exames:cmap.pacientes)||fc(row,cmap.qtd);
+      const tot=parseFloat(tC?row[tC]:0)||0;
+      const ex=DB.find(r=>r.un===un&&r.per===per);
+      if(ex){if(tipo==='exames')ex.ex=(ex.ex||0)+tot;else ex.pa=(ex.pa||0)+tot;}
+      else{const qtds=new Array(INSUMOS.length).fill(0);DB.push({id:Date.now()+n,un,per,ex:tipo==='exames'?tot:0,pa:tipo==='pacientes'?tot:0,qtds,src:'import'});}
+      n++;
+    }
+  });
+  saveDB();updateStats();buildDashCharts();
+  document.getElementById('preview-card').style.display='none';uploadBuf=null;
+  alert(`✅ ${n} registros importados!`);
+}
+function cancelarImport(){uploadBuf=null;document.getElementById('preview-card').style.display='none';}
+
+// ===== CALC PREVISÃO =====
+function calcPrevisao(regs,metodo,margem,tipoPeriodo='mensal'){
+  const fator=tipoPeriodo==='quinzenal'?0.5:1;
+  const periodos=[...new Set(regs.map(r=>r.per))].sort();
+  return INSUMOS.map((ins,i)=>{
+    let serie=periodos.map(p=>{const r=regs.find(x=>x.per===p);return r?r.qtds[i]||0:0;}).filter(v=>v>0);
+    if(!serie.length)return{ins,prev:0,media:0};
+    let prev=0;
+    if(metodo==='media')prev=serie.reduce((s,v)=>s+v,0)/serie.length;
+    else if(metodo==='media3'){const sl=serie.slice(-3);prev=sl.reduce((s,v)=>s+v,0)/sl.length;}
+    else if(metodo==='media6'){const sl=serie.slice(-6);prev=sl.reduce((s,v)=>s+v,0)/sl.length;}
+    else if(metodo==='maximo')prev=Math.max(...serie);
+    else if(metodo==='tendencia'){
+      if(serie.length<2)prev=serie[0];
+      else{const n=serie.length,sx=n*(n-1)/2,sy=serie.reduce((s,v)=>s+v,0),sxy=serie.reduce((s,v,j)=>s+j*v,0),sx2=serie.reduce((s,_,j)=>s+j*j,0),slope=(n*sxy-sx*sy)/(n*sx2-sx*sx)||0;prev=Math.max(0,serie[serie.length-1]+slope);}
+    }
+    const media=Math.round((serie.reduce((s,v)=>s+v,0)/serie.length)*fator);
+    prev=Math.max(0,Math.round(prev*(1+margem/100)*fator));
+    return{ins,prev,media};
+  }).filter(p=>p.prev>0);
+}
+
+// ===== PREVISÃO TAB =====
+function gerarPrevisao(){
+  const unF=document.getElementById('pv-un').value;
+  const met=document.getElementById('pv-met').value;
+  const mg=parseFloat(document.getElementById('pv-mg').value)||0;
+  const tipo=document.getElementById('pv-tipo').value;
+  const out=document.getElementById('prev-output');
+  if(!DB.length){out.innerHTML='<div class="alert alert-warn">⚠️ Sem dados. Importe planilhas ou use entrada manual.</div>';return;}
+  const uns=unF==='todas'?UNIDADES:[unF];
+  let html=`<div class="alert alert-success mb-3">✅ Previsão gerada · Método: <strong>${METODO_LABEL[met]}</strong> · Tipo: <strong>${tipo==='quinzenal'?'Quinzenal':'Mensal'}</strong> · Margem: <strong>+${mg}%</strong></div><div class="previsao-grid">`;
+  let hasAny=false;
+  uns.forEach(un=>{
+    const regs=DB.filter(r=>r.un===un);if(!regs.length)return;
+    const prevs=calcPrevisao(regs,met,mg,tipo);if(!prevs.length)return;
+    hasAny=true;
+    const total=prevs.reduce((s,p)=>s+p.prev,0);
+    const pers=[...new Set(regs.map(r=>r.per))].sort();
+    html+=`<div class="prev-card"><div class="prev-card-head"><div><div class="unit-name">${un}</div><div style="font-size:9px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:1px">${pers.length} per. · último: ${pers[pers.length-1]}</div></div><div style="text-align:right"><div style="font-size:15px;font-weight:800;font-family:'DM Mono',monospace;color:var(--accent)">${total.toLocaleString()}</div><div style="font-size:9px;color:var(--muted)">itens</div></div></div><div class="prev-body">`;
+    const bc={};prevs.forEach(p=>{if(!bc[p.ins.c])bc[p.ins.c]=[];bc[p.ins.c].push(p);});
+    Object.entries(bc).forEach(([cat,items])=>{
+      html+=`<div class="cat-label">${cat}</div>`;
+      items.forEach(p=>html+=`<div class="prev-row"><div class="insumo-name">${p.ins.n}</div><div class="insumo-qty">${p.prev.toLocaleString()}</div></div>`);
+    });
+    html+=`</div></div>`;
+  });
+  html+='</div>';
+  if(!hasAny)html='<div class="alert alert-warn">⚠️ Sem dados suficientes para as unidades selecionadas.</div>';
+  out.innerHTML=html;
+}
+
+// ===== RANKING =====
+function buildRanking(){
+  const unF=document.getElementById('rk-un')?.value||'todas';
+  const catF=document.getElementById('rk-cat')?.value||'todas';
+  let regs=unF==='todas'?DB:DB.filter(r=>r.un===unF);
+  const tots=INSUMOS.map((ins,i)=>({ins,total:regs.reduce((s,r)=>s+(r.qtds[i]||0),0)})).filter(t=>t.total>0);
+  let fil=catF==='todas'?tots:tots.filter(t=>t.ins.c===catF);
+  fil.sort((a,b)=>b.total-a.total);const top=fil.slice(0,15);const mx=top[0]?.total||1;
+  const el=document.getElementById('rank-list');
+  if(!top.length){el.innerHTML='<div class="empty-state"><div class="icon">📊</div><p>Sem dados</p></div>';return;}
+  let html='';
+  top.forEach((t,i)=>{
+    const pct=Math.round(t.total/mx*100);
+    html+=`<div style="padding:7px 3px;border-bottom:1px solid rgba(30,45,69,0.5)"><div class="flex justify-between items-center" style="margin-bottom:2px"><div style="font-size:11px;flex:1;margin-right:9px;font-family:'Syne',sans-serif">${i+1}. ${t.ins.n}</div><div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--accent)">${t.total.toLocaleString()}</div></div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div><div style="font-size:9px;color:var(--muted);margin-top:2px">${t.ins.c}</div></div>`;
+  });
+  el.innerHTML=html;
+  // Units chart
+  const uT=UNIDADES.map(u=>({u,total:DB.filter(r=>r.un===u).reduce((s,r)=>s+r.qtds.reduce((a,b)=>a+b,0),0)})).filter(t=>t.total>0).sort((a,b)=>b.total-a.total).slice(0,12);
+  dc('chart-units');const c1=document.getElementById('chart-units');
+  if(c1&&uT.length)CI['chart-units']=new Chart(c1,{type:'bar',data:{labels:uT.map(t=>t.u.length>13?t.u.substring(0,12)+'…':t.u),datasets:[{data:uT.map(t=>t.total),backgroundColor:'rgba(0,200,160,0.55)',borderColor:'rgba(0,200,160,1)',borderWidth:1,borderRadius:4}]},options:co()});
+  // Stacked comparison
+  const top6=uT.slice(0,6).map(t=>t.u);
+  const datasets=CATS.map((cat,ci)=>({label:cat,data:top6.map(un=>{const rU=DB.filter(r=>r.un===un);return INSUMOS.reduce((s,ins,i)=>ins.c===cat?s+rU.reduce((a,r)=>a+(r.qtds[i]||0),0):s,0);}),backgroundColor:CAT_COLORS[ci%CAT_COLORS.length]+'99',borderColor:CAT_COLORS[ci%CAT_COLORS.length],borderWidth:1}));
+  dc('chart-comp');const c2=document.getElementById('chart-comp');
+  if(c2&&top6.length)CI['chart-comp']=new Chart(c2,{type:'bar',data:{labels:top6.map(u=>u.length>12?u.substring(0,11)+'…':u),datasets},options:{...co(),plugins:{...co().plugins,legend:{display:true,labels:{color:'#5a7090',font:{size:9},boxWidth:10,padding:6}}},scales:{x:{stacked:true,ticks:{color:'#5a7090',font:{size:9}},grid:{color:'rgba(30,45,69,0.5)'}},y:{stacked:true,ticks:{color:'#5a7090',font:{size:9}},grid:{color:'rgba(30,45,69,0.5)'}}}}});
+}
+
+// ===== RELATÓRIO CONSOLIDADO =====
+function gerarRelatorio(){
+  if(!DB.length){document.getElementById('relatorio-area').innerHTML='<div class="alert alert-warn">⚠️ Sem dados cadastrados.</div>';return;}
+  const met=document.getElementById('rel-met').value;
+  const mg=parseFloat(document.getElementById('rel-mg').value)||10;
+  const ref=document.getElementById('rel-ref').value||'—';
+  const tipo=document.getElementById('rel-tipo').value;
+  const now=new Date().toLocaleDateString('pt-BR');
+  const uns=UNIDADES.filter(u=>DB.some(r=>r.un===u));
+  const summaryRows=[];
+  uns.forEach(un=>{
+    const regs=DB.filter(r=>r.un===un);if(!regs.length)return;
+    const prevs=calcPrevisao(regs,met,mg,tipo);
+    const tp=prevs.reduce((s,p)=>s+p.prev,0);
+    const pers=[...new Set(regs.map(r=>r.per))].sort();
+    summaryRows.push({un,pers:pers.length,ultPer:pers[pers.length-1],exames:regs.reduce((s,r)=>s+(r.ex||0),0),pacientes:regs.reduce((s,r)=>s+(r.pa||0),0),totalPrev:tp,prevs});
+  });
+  summaryRows.sort((a,b)=>b.totalPrev-a.totalPrev);
+  const grandTotal=summaryRows.reduce((s,r)=>s+r.totalPrev,0);
+  const insumoTotais=INSUMOS.map((ins,i)=>({ins,prev:summaryRows.reduce((s,row)=>{const p=row.prevs.find(p=>p.ins===ins);return s+(p?p.prev:0);},0)})).filter(p=>p.prev>0).sort((a,b)=>b.prev-a.prev);
+  const byCat={};
+  insumoTotais.forEach(p=>{if(!byCat[p.ins.c])byCat[p.ins.c]=[];byCat[p.ins.c].push(p);});
+
+  let html=`
+  <div class="card" style="border-color:rgba(0,200,160,0.35)">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:18px">
+      <div>
+        <div style="font-size:20px;font-weight:800;letter-spacing:-0.3px">RELATÓRIO CONSOLIDADO DE INSUMOS</div>
+        <div style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:4px">
+          Referência: <strong style="color:var(--accent)">${ref}</strong> &nbsp;·&nbsp; Tipo: <strong>${tipo==='quinzenal'?'Quinzenal':'Mensal'}</strong> &nbsp;·&nbsp; Método: <strong>${METODO_LABEL[met]}</strong> &nbsp;·&nbsp; Margem: <strong>+${mg}%</strong> &nbsp;·&nbsp; Gerado: ${now}
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:30px;font-weight:800;font-family:'DM Mono',monospace;color:var(--accent)">${grandTotal.toLocaleString()}</div>
+        <div style="font-size:11px;color:var(--muted)">itens previstos no total</div>
+      </div>
+    </div>
+
+    <div class="card-title mb-3">▸ Resumo por Unidade</div>
+    <div class="table-wrap mb-4">
+      <table><thead><tr><th>#</th><th>Unidade</th><th>Períodos</th><th>Último</th><th>Exames</th><th>Pacientes</th><th>Prev. Itens</th><th>% Total</th></tr></thead><tbody>`;
+
+  summaryRows.forEach((row,i)=>{
+    const pct=(row.totalPrev/grandTotal*100).toFixed(1);
+    html+=`<tr><td style="color:var(--muted)">${i+1}</td><td style="font-weight:700;font-family:'Syne',sans-serif">${row.un}</td><td>${row.pers}</td><td>${row.ultPer}</td><td>${row.exames.toLocaleString()}</td><td>${row.pacientes.toLocaleString()}</td><td><span class="badge bg-green" style="font-size:11px">${row.totalPrev.toLocaleString()}</span></td><td><div style="display:flex;align-items:center;gap:7px"><div class="progress-bar" style="flex:1;min-width:55px"><div class="progress-fill" style="width:${pct}%"></div></div><div style="font-size:10px;color:var(--muted);min-width:34px;text-align:right">${pct}%</div></div></td></tr>`;
+  });
+  html+=`<tr style="border-top:2px solid rgba(0,200,160,0.4)"><td colspan="6" style="font-weight:700;font-family:'Syne',sans-serif;color:var(--accent)">TOTAL GERAL</td><td><span class="badge bg-green" style="font-size:12px;font-weight:800">${grandTotal.toLocaleString()}</span></td><td><span style="font-size:11px;color:var(--accent);font-weight:700">100%</span></td></tr>`;
+  html+=`</tbody></table></div>
+
+    <div class="card-title mb-3">▸ Pedido Consolidado por Categoria</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:13px;margin-bottom:18px">`;
+
+  Object.entries(byCat).forEach(([cat,items])=>{
+    const catTotal=items.reduce((s,p)=>s+p.prev,0);
+    html+=`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;overflow:hidden"><div style="padding:10px 13px;background:rgba(0,200,160,0.07);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:var(--accent)">${cat}</div><div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${catTotal.toLocaleString()}</div></div><div style="padding:7px">`;
+    items.forEach(p=>html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 7px;border-radius:4px"><div style="font-size:11px;font-family:'Syne',sans-serif;flex:1;margin-right:9px">${p.ins.n}</div><div style="font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:var(--accent)">${p.prev.toLocaleString()}</div></div>`);
+    html+=`</div></div>`;
+  });
+  html+=`</div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="card"><div class="card-header"><span class="card-title">Previsão por Unidade</span></div><div class="chart-container chart-sm"><canvas id="rel-c1"></canvas></div></div>
+      <div class="card"><div class="card-header"><span class="card-title">Previsão por Categoria</span></div><div class="chart-container chart-sm"><canvas id="rel-c2"></canvas></div></div>
+    </div>
+  </div>`;
+
+  document.getElementById('relatorio-area').innerHTML=html;
+
+  // Build charts + print area
+  setTimeout(()=>{
+    dc('rel-c1');const c1=document.getElementById('rel-c1');
+    if(c1)CI['rel-c1']=new Chart(c1,{type:'bar',data:{labels:summaryRows.map(r=>r.un.length>13?r.un.substring(0,12)+'…':r.un),datasets:[{data:summaryRows.map(r=>r.totalPrev),backgroundColor:'rgba(0,200,160,0.6)',borderColor:'rgba(0,200,160,1)',borderWidth:1,borderRadius:4}]},options:co()});
+    dc('rel-c2');const c2=document.getElementById('rel-c2');
+    const catTots=Object.entries(byCat).map(([cat,items])=>({cat,total:items.reduce((s,p)=>s+p.prev,0)}));
+    if(c2)CI['rel-c2']=new Chart(c2,{type:'doughnut',data:{labels:catTots.map(t=>t.cat),datasets:[{data:catTots.map(t=>t.total),backgroundColor:CAT_COLORS,borderWidth:2,borderColor:'#111827'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{color:'#5a7090',font:{size:9},boxWidth:10,padding:5}},tooltip:{...co().plugins.tooltip}}}});
+
+    // Build print area
+    buildPrintArea(summaryRows,byCat,insumoTotais,catTots,grandTotal,ref,met,mg,now,tipo);
+  },150);
+}
+
+function buildPrintArea(summaryRows,byCat,insumoTotais,catTots,grandTotal,ref,met,mg,now,tipo){
+  const pa=document.getElementById('print-area');
+  let html=`
+  <!-- PAGE 1: Cover + Summary -->
+  <div class="print-page">
+    <div class="print-logo">
+      <div class="print-logo-icon">🧪</div>
+      <div><div class="print-logo-text">HEMOLAB</div><div style="font-size:9pt;color:#555;font-family:'Courier New',monospace">SISTEMA DE PREVISÃO DE INSUMOS</div></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+      <div>
+        <div class="print-section-title">RELATÓRIO CONSOLIDADO DE INSUMOS</div>
+        <div class="print-meta">
+          Período de Referência: <strong>${ref}</strong> &nbsp;|&nbsp; Tipo: ${tipo==='quinzenal'?'Quinzenal':'Mensal'} &nbsp;|&nbsp; Método: ${METODO_LABEL[met]} &nbsp;|&nbsp; Margem: +${mg}%<br>
+          Gerado em: ${now} &nbsp;|&nbsp; ${summaryRows.length} unidade(s) com dados
+        </div>
+      </div>
+      <div style="text-align:right;background:#e8fff7;border:1px solid #00c8a0;border-radius:6px;padding:10px 16px">
+        <div style="font-size:24pt;font-weight:800;font-family:'Courier New',monospace;color:#007755">${grandTotal.toLocaleString()}</div>
+        <div style="font-size:8pt;color:#555">TOTAL DE ITENS PREVISTOS</div>
+      </div>
+    </div>
+
+    <div class="print-section-title">RESUMO POR UNIDADE</div>
+    <table class="print-summary-table">
+      <thead><tr><th>#</th><th>Unidade</th><th>Períodos</th><th>Último Per.</th><th>Exames</th><th>Pacientes</th><th>Itens Previstos</th><th>% Total</th></tr></thead>
+      <tbody>`;
+  summaryRows.forEach((r,i)=>{
+    const pct=(r.totalPrev/grandTotal*100).toFixed(1);
+    html+=`<tr><td>${i+1}</td><td><strong>${r.un}</strong></td><td>${r.pers}</td><td>${r.ultPer}</td><td>${r.exames.toLocaleString()}</td><td>${r.pacientes.toLocaleString()}</td><td><strong>${r.totalPrev.toLocaleString()}</strong></td><td>${pct}%</td></tr>`;
+  });
+  html+=`<tr class="total-row"><td colspan="6"><strong>TOTAL GERAL</strong></td><td><strong>${grandTotal.toLocaleString()}</strong></td><td><strong>100%</strong></td></tr>`;
+  html+=`</tbody></table>
+    <div class="page-num">Página 1</div>
+  </div>
+
+  <!-- PAGE 2: Charts -->
+  <div class="print-page">
+    <div class="print-logo"><div class="print-logo-icon">🧪</div><div><div class="print-logo-text">HEMOLAB</div><div style="font-size:8pt;color:#555">Relatório: ${ref} · ${now}</div></div></div>
+    <div class="print-section-title">ANÁLISE GRÁFICA</div>
+    <div class="print-chart-row">
+      <div class="print-chart-box">
+        <div class="print-chart-title">Previsão de Itens por Unidade</div>
+        <canvas id="pc1" height="200"></canvas>
+      </div>
+      <div class="print-chart-box">
+        <div class="print-chart-title">Distribuição por Categoria</div>
+        <canvas id="pc2" height="200"></canvas>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <div class="print-section-title">TOP 15 INSUMOS MAIS PREVISTOS (CONSOLIDADO)</div>
+      <table class="print-summary-table">
+        <thead><tr><th>#</th><th>Insumo</th><th>Categoria</th><th>Qtd. Prevista (Total)</th></tr></thead>
+        <tbody>`;
+  insumoTotais.slice(0,15).forEach((p,i)=>html+=`<tr><td>${i+1}</td><td>${p.ins.n}</td><td>${p.ins.c}</td><td><strong>${p.prev.toLocaleString()}</strong></td></tr>`);
+  html+=`</tbody></table></div>
+    <div class="page-num">Página 2</div>
+  </div>
+
+  <!-- PAGE 3: Consolidated by Category -->
+  <div class="print-page">
+    <div class="print-logo"><div class="print-logo-icon">🧪</div><div><div class="print-logo-text">HEMOLAB</div><div style="font-size:8pt;color:#555">Relatório: ${ref} · ${now}</div></div></div>
+    <div class="print-section-title">PEDIDO CONSOLIDADO POR CATEGORIA (TODAS AS UNIDADES)</div>
+    <div class="print-insumo-grid">`;
+  Object.entries(byCat).forEach(([cat,items])=>{
+    const catTotal=items.reduce((s,p)=>s+p.prev,0);
+    html+=`<div class="print-cat-box"><div class="print-cat-head"><span>${cat}</span><span>${catTotal.toLocaleString()} itens</span></div>`;
+    items.forEach(p=>html+=`<div class="print-cat-row"><span>${p.ins.n}</span><span class="print-cat-qty">${p.prev.toLocaleString()}</span></div>`);
+    html+=`</div>`;
+  });
+  html+=`</div><div class="page-num">Página 3</div></div>
+
+  <!-- PAGE 4+: Per Unit -->`;
+
+  summaryRows.forEach((row,ri)=>{
+    if(!row.prevs.length)return;
+    const rowByCat={};
+    row.prevs.forEach(p=>{if(!rowByCat[p.ins.c])rowByCat[p.ins.c]=[];rowByCat[p.ins.c].push(p);});
+    html+=`<div class="print-page">
+      <div class="print-logo"><div class="print-logo-icon">🧪</div><div><div class="print-logo-text">HEMOLAB</div><div style="font-size:8pt;color:#555">Pedido por Unidade · ${ref} · ${now}</div></div></div>
+      <div class="print-section-title">PEDIDO PREVISTO — ${row.un}</div>
+      <div class="print-meta">Períodos analisados: ${row.pers} &nbsp;|&nbsp; Último: ${row.ultPer} &nbsp;|&nbsp; Total de itens: ${row.totalPrev.toLocaleString()}</div>`;
+    Object.entries(rowByCat).forEach(([cat,items])=>{
+      html+=`<div class="print-unit-section"><div class="print-unit-head">${cat}</div>
+        <table class="print-unit-table"><thead><tr><th>Insumo</th><th>Média Hist.</th><th>Previsão (+${mg}%)</th></tr></thead><tbody>`;
+      items.forEach(p=>html+=`<tr><td>${p.ins.n}</td><td>${p.media.toLocaleString()}</td><td><strong>${p.prev.toLocaleString()}</strong></td></tr>`);
+      html+=`</tbody></table></div>`;
+    });
+    html+=`<div class="page-num">Unidade ${ri+1} de ${summaryRows.length}</div></div>`;
+  });
+
+  pa.innerHTML=html;
+
+  // Draw print charts after DOM
+  setTimeout(()=>{
+    const pc1=document.getElementById('pc1');
+    if(pc1)new Chart(pc1,{type:'bar',data:{labels:summaryRows.map(r=>r.un.length>12?r.un.substring(0,11)+'…':r.un),datasets:[{data:summaryRows.map(r=>r.totalPrev),backgroundColor:'rgba(0,180,130,0.7)',borderColor:'#007755',borderWidth:1}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:8}}},y:{ticks:{font:{size:8}}}}}});
+    const pc2=document.getElementById('pc2');
+    if(pc2)new Chart(pc2,{type:'doughnut',data:{labels:catTots.map(t=>t.cat),datasets:[{data:catTots.map(t=>t.total),backgroundColor:['#00c8a0','#0080ff','#ff6b35','#ff4d6d','#a855f7','#f59e0b','#06b6d4'],borderWidth:2}]},options:{responsive:true,plugins:{legend:{display:true,position:'right',labels:{font:{size:8},padding:6}}}}});
+  },200);
+}
+
+function imprimirRelatorio(){
+  if(!document.getElementById('print-area').innerHTML.trim()){alert('Gere o relatório primeiro!');return;}
+  window.print();
+}
+
+function exportarExcel(){
+  if(!DB.length){alert('Sem dados!');return;}
+  const met=document.getElementById('rel-met').value;
+  const mg=parseFloat(document.getElementById('rel-mg').value)||10;
+  const ref=document.getElementById('rel-ref').value||'PREVISAO';
+  const tipo=document.getElementById('rel-tipo').value;
+  const wb=XLSX.utils.book_new();
+  const uns=UNIDADES.filter(u=>DB.some(r=>r.un===u));
+  // Summary
+  const sData=[['UNIDADE','PERÍODOS','ÚLTIMO PERÍODO','TOTAL EXAMES','TOTAL PACIENTES','ITENS PREVISTOS']];
+  let gt=0;
+  uns.forEach(un=>{
+    const regs=DB.filter(r=>r.un===un);if(!regs.length)return;
+    const prevs=calcPrevisao(regs,met,mg,tipo);const tp=prevs.reduce((s,p)=>s+p.prev,0);gt+=tp;
+    const pers=[...new Set(regs.map(r=>r.per))].sort();
+    sData.push([un,pers.length,pers[pers.length-1],regs.reduce((s,r)=>s+(r.ex||0),0),regs.reduce((s,r)=>s+(r.pa||0),0),tp]);
+  });
+  sData.push(['','','','','','']);sData.push(['TOTAL GERAL','','','','',gt]);
+  const ws0=XLSX.utils.aoa_to_sheet(sData);ws0['!cols']=[{wch:22},{wch:10},{wch:14},{wch:15},{wch:16},{wch:16}];
+  XLSX.utils.book_append_sheet(wb,ws0,'RESUMO GERAL');
+  // Consolidated
+  const cData=[['INSUMO','CATEGORIA','TOTAL PREVISTO (TODAS UNIDADES)']];
+  const iT=INSUMOS.map((ins,i)=>({ins,prev:uns.reduce((s,un)=>{const r=DB.filter(r=>r.un===un);if(!r.length)return s;const p=calcPrevisao(r,met,mg,tipo).find(p=>p.ins===ins);return s+(p?p.prev:0);},0)})).filter(p=>p.prev>0).sort((a,b)=>b.prev-a.prev);
+  iT.forEach(p=>cData.push([p.ins.n,p.ins.c,p.prev]));
+  const ws1=XLSX.utils.aoa_to_sheet(cData);ws1['!cols']=[{wch:40},{wch:25},{wch:30}];
+  XLSX.utils.book_append_sheet(wb,ws1,'CONSOLIDADO');
+  // Per unit
+  uns.forEach(un=>{
+    const regs=DB.filter(r=>r.un===un);if(!regs.length)return;
+    const prevs=calcPrevisao(regs,met,mg,tipo);if(!prevs.length)return;
+    const rows=[['INSUMO','CATEGORIA','MÉDIA HIST.','PREVISÃO']];
+    prevs.forEach(p=>rows.push([p.ins.n,p.ins.c,p.media,p.prev]));
+    const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[{wch:38},{wch:24},{wch:13},{wch:12}];
+    XLSX.utils.book_append_sheet(wb,ws,un.substring(0,28));
+  });
+  XLSX.writeFile(wb,`Hemolab_Insumos_${ref.replace(/[^a-zA-Z0-9]/g,'_')}.xlsx`);
+}
+
+// ===== DASHBOARD CHARTS =====
+function buildDashCharts(){
+  const cT={};CATS.forEach(c=>cT[c]=0);
+  DB.forEach(r=>INSUMOS.forEach((ins,i)=>cT[ins.c]+=(r.qtds[i]||0)));
+  const cL=Object.keys(cT).filter(k=>cT[k]>0),cV=cL.map(k=>cT[k]);
+  dc('chart-cat');const c1=document.getElementById('chart-cat');
+  if(c1&&cV.length)CI['chart-cat']=new Chart(c1,{type:'doughnut',data:{labels:cL,datasets:[{data:cV,backgroundColor:CAT_COLORS,borderWidth:2,borderColor:'#111827'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{color:'#5a7090',font:{size:9},boxWidth:10,padding:5}},tooltip:{...co().plugins.tooltip}}}});
+  const iT=INSUMOS.map((ins,i)=>({n:ins.n,t:DB.reduce((s,r)=>s+(r.qtds[i]||0),0)})).filter(t=>t.t>0).sort((a,b)=>b.t-a.t).slice(0,10);
+  dc('chart-top');const c2=document.getElementById('chart-top');
+  if(c2&&iT.length)CI['chart-top']=new Chart(c2,{type:'bar',data:{labels:iT.map(t=>t.n.length>22?t.n.substring(0,20)+'…':t.n),datasets:[{data:iT.map(t=>t.t),backgroundColor:'rgba(0,128,255,0.6)',borderColor:'rgba(0,128,255,1)',borderWidth:1,borderRadius:4}]},options:{...co(),indexAxis:'y'}});
+  const ps=[...new Set(DB.map(r=>r.per))].sort().slice(-12);
+  const eD=ps.map(p=>DB.filter(r=>r.per===p).reduce((s,r)=>s+r.qtds.reduce((a,b)=>a+b,0),0));
+  dc('chart-evol');const c3=document.getElementById('chart-evol');
+  if(c3&&ps.length)CI['chart-evol']=new Chart(c3,{type:'line',data:{labels:ps,datasets:[{label:'Total',data:eD,borderColor:'#00c8a0',backgroundColor:'rgba(0,200,160,0.1)',borderWidth:2,tension:0.3,fill:true,pointBackgroundColor:'#00c8a0',pointRadius:4}]},options:co()});
+  const el=document.getElementById('dash-recent');if(!el)return;
+  if(!DB.length){el.innerHTML='<div class="empty-state"><div class="icon">📋</div><p>Importe dados ou use entrada manual</p></div>';return;}
+  const s=[...DB].sort((a,b)=>b.per.localeCompare(a.per)).slice(0,7);
+  let html='<div class="table-wrap"><table><thead><tr><th>Unidade</th><th>Período</th><th>Exames</th><th>Pacientes</th><th>Itens</th></tr></thead><tbody>';
+  s.forEach(r=>{const tot=r.qtds.reduce((s,v)=>s+v,0);html+=`<tr><td style="font-weight:700;font-family:'Syne',sans-serif">${r.un}</td><td>${r.per}</td><td>${(r.ex||0).toLocaleString()}</td><td>${(r.pa||0).toLocaleString()}</td><td><span class="badge bg-green">${tot.toLocaleString()}</span></td></tr>`;});
+  html+='</tbody></table></div>';el.innerHTML=html;
+}
+
+function dc(id){if(CI[id]){CI[id].destroy();delete CI[id];}}
+function co(){return{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a2235',borderColor:'#1e2d45',borderWidth:1,titleColor:'#e2eaf5',bodyColor:'#5a7090',padding:10}},scales:{x:{ticks:{color:'#5a7090',font:{size:9}},grid:{color:'rgba(30,45,69,0.5)'}},y:{ticks:{color:'#5a7090',font:{size:9}},grid:{color:'rgba(30,45,69,0.5)'}}}}}
+
+// ===== STATS =====
+function updateStats(){
+  document.getElementById('st-per').textContent=[...new Set(DB.map(r=>r.per))].length;
+  document.getElementById('st-ex').textContent=DB.reduce((s,r)=>s+(r.ex||0),0).toLocaleString();
+  document.getElementById('st-pa').textContent=DB.reduce((s,r)=>s+(r.pa||0),0).toLocaleString();
+  document.getElementById('st-reg').textContent=DB.length.toLocaleString();
+  const h=DB.length>0;
+  document.getElementById('data-status').textContent=h?`${DB.length} registros · ${[...new Set(DB.map(r=>r.un))].length} unidades`:'Sem dados carregados';
+  document.getElementById('data-status').style.color=h?'var(--accent)':'var(--muted)';
+}
+
+// ===== NAV =====
+function switchTab(tab,el){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById(`tab-${tab}`).classList.add('active');
+  el.classList.add('active');
+  if(tab==='ranking')buildRanking();
+}
+
+// ===== CLOCK =====
+function initClock(){
+  const tick=()=>document.getElementById('clock').textContent=new Date().toLocaleDateString('pt-BR')+' · '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  tick();setInterval(tick,1000);
+}
+
+init();
+</script>
+</body>
+</html>
